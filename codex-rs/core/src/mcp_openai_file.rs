@@ -10,11 +10,14 @@
 //! Model-visible schema masking is owned by `codex-mcp` alongside MCP tool
 //! inventory, so this module only handles the execution-time argument rewrite.
 
+use crate::codex_apps_file_download::maybe_materialize_codex_apps_file_download_result;
 use crate::session::session::Session;
 use crate::session::turn_context::TurnContext;
 use codex_api::OpenAiFileUploadOptions;
 use codex_api::upload_local_file;
 use codex_login::CodexAuth;
+use codex_protocol::mcp::CallToolResult;
+use serde_json::Map as JsonMap;
 use serde_json::Value as JsonValue;
 
 pub(crate) async fn rewrite_mcp_tool_arguments_for_openai_files(
@@ -60,6 +63,23 @@ pub(crate) async fn rewrite_mcp_tool_arguments_for_openai_files(
     }
 
     Ok(Some(JsonValue::Object(rewritten_arguments)))
+}
+
+pub(crate) async fn postprocess_mcp_tool_result_for_openai_files(
+    sess: &Session,
+    turn_context: &TurnContext,
+    server: &str,
+    codex_apps_meta: Option<&JsonMap<String, JsonValue>>,
+    result: CallToolResult,
+) -> CallToolResult {
+    maybe_materialize_codex_apps_file_download_result(
+        sess,
+        turn_context,
+        server,
+        codex_apps_meta,
+        result,
+    )
+    .await
 }
 
 async fn rewrite_argument_value_for_openai_files(
