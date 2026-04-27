@@ -129,7 +129,6 @@ async fn login_with_agent_identity_rejects_invalid_jwt() {
         dir.path(),
         "not-a-jwt",
         AuthCredentialsStoreMode::File,
-        /*agent_identity_authapi_base_url*/ None,
         /*chatgpt_base_url*/ None,
     )
     .await
@@ -740,6 +739,7 @@ async fn load_auth_reads_agent_identity_from_env() {
         codex_home.path(),
         /*enable_codex_api_key_env*/ false,
         AuthCredentialsStoreMode::File,
+        /*agent_identity_authapi_base_url*/ Some(&chatgpt_base_url),
         Some(&chatgpt_base_url),
     )
     .await
