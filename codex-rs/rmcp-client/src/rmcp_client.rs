@@ -67,6 +67,7 @@ use crate::oauth::OAuthPersistor;
 use crate::oauth::StoredOAuthTokens;
 use crate::stdio_server_launcher::StdioServerCommand;
 use crate::stdio_server_launcher::StdioServerLauncher;
+use crate::stdio_server_launcher::StdioServerTelemetrySink;
 use crate::stdio_server_launcher::StdioServerTransport;
 use crate::utils::apply_default_headers;
 use crate::utils::build_default_headers;
@@ -279,9 +280,17 @@ impl RmcpClient {
         env_vars: &[McpServerEnvVar],
         cwd: Option<PathBuf>,
         launcher: Arc<dyn StdioServerLauncher>,
+        telemetry_sink: Option<StdioServerTelemetrySink>,
     ) -> io::Result<Self> {
         let transport_recipe = TransportRecipe::Stdio {
-            command: StdioServerCommand::new(program, args, env, env_vars.to_vec(), cwd),
+            command: StdioServerCommand::new(
+                program,
+                args,
+                env,
+                env_vars.to_vec(),
+                cwd,
+                telemetry_sink,
+            ),
             launcher,
         };
         let transport = Self::create_pending_transport(&transport_recipe)

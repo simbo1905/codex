@@ -81,6 +81,7 @@ async fn drop_kills_wrapper_process_group() -> Result<()> {
         &[],
         /*cwd*/ None,
         Arc::new(LocalStdioServerLauncher::new(std::env::current_dir()?)),
+        /*telemetry_sink*/ None,
     )
     .await?;
 

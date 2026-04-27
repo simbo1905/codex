@@ -35,3 +35,5 @@ pub use rmcp_client::ToolWithConnectorId;
 pub use stdio_server_launcher::ExecutorStdioServerLauncher;
 pub use stdio_server_launcher::LocalStdioServerLauncher;
 pub use stdio_server_launcher::StdioServerLauncher;
+pub use stdio_server_launcher::StdioServerTelemetry;
+pub use stdio_server_launcher::StdioServerTelemetrySink;

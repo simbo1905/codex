@@ -79,7 +79,15 @@ pub struct StdioServerCommand {
     env: Option<HashMap<OsString, OsString>>,
     env_vars: Vec<McpServerEnvVar>,
     cwd: Option<PathBuf>,
+    telemetry_sink: Option<StdioServerTelemetrySink>,
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct StdioServerTelemetry {
+    pub payload: serde_json::Value,
+}
+
+pub type StdioServerTelemetrySink = Arc<dyn Fn(StdioServerTelemetry) + Send + Sync>;
 
 /// Client-side rmcp transport for a launched MCP stdio server.
 ///
@@ -143,6 +151,7 @@ impl StdioServerCommand {
         env: Option<HashMap<OsString, OsString>>,
         env_vars: Vec<McpServerEnvVar>,
         cwd: Option<PathBuf>,
+        telemetry_sink: Option<StdioServerTelemetrySink>,
     ) -> Self {
         Self {
             program,
@@ -150,6 +159,7 @@ impl StdioServerCommand {
             env,
             env_vars,
             cwd,
+            telemetry_sink,
         }
     }
 }
@@ -216,6 +226,7 @@ impl LocalStdioServerLauncher {
             env,
             env_vars,
             cwd,
+            telemetry_sink,
         } = command;
         let program_name = program.to_string_lossy().into_owned();
         let envs = create_env_for_mcp_server(env, &env_vars).map_err(io::Error::other)?;
@@ -246,7 +257,7 @@ impl LocalStdioServerLauncher {
                 loop {
                     match reader.next_line().await {
                         Ok(Some(line)) => {
-                            info!("MCP server stderr ({program_name}): {line}");
+                            handle_stderr_line(&program_name, &line, telemetry_sink.as_ref());
                         }
                         Ok(None) => break,
                         Err(error) => {
@@ -364,6 +375,7 @@ impl ExecutorStdioServerLauncher {
             env,
             env_vars,
             cwd,
+            telemetry_sink: _,
         } = command;
         let program_name = program.to_string_lossy().into_owned();
         let envs = create_env_overlay_for_remote_mcp_server(env, &env_vars);
@@ -461,6 +473,38 @@ impl ExecutorStdioServerLauncher {
     }
 }
 
+const CODEX_TELEMETRY_STDERR_PREFIX: &str = "@codex-telemetry ";
+
+fn handle_stderr_line(
+    program_name: &str,
+    line: &str,
+    telemetry_sink: Option<&StdioServerTelemetrySink>,
+) {
+    let Some(sink) = telemetry_sink else {
+        info!("MCP server stderr ({program_name}): {line}");
+        return;
+    };
+
+    let Some(telemetry) = parse_stderr_telemetry_line(line) else {
+        info!("MCP server stderr ({program_name}): {line}");
+        return;
+    };
+
+    match telemetry {
+        Ok(telemetry) => sink(telemetry),
+        Err(error) => {
+            warn!("Failed to parse MCP server telemetry ({program_name}): {error}");
+        }
+    }
+}
+
+fn parse_stderr_telemetry_line(
+    line: &str,
+) -> Option<Result<StdioServerTelemetry, serde_json::Error>> {
+    let payload = line.strip_prefix(CODEX_TELEMETRY_STDERR_PREFIX)?;
+    Some(serde_json::from_str(payload).map(|payload| StdioServerTelemetry { payload }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -533,5 +577,28 @@ mod tests {
             Some("remote-secret")
         );
         assert!(!env.contains_key("UNREQUESTED_SECRET"));
+    }
+
+    #[test]
+    fn stderr_telemetry_parser_separates_prefixed_lines_from_normal_stderr() {
+        assert!(parse_stderr_telemetry_line("ordinary stderr").is_none());
+
+        assert_eq!(
+            parse_stderr_telemetry_line("@codex-telemetry {\"v\":1,\"type\":\"span\"}")
+                .expect("telemetry line")
+                .expect("valid telemetry"),
+            StdioServerTelemetry {
+                payload: serde_json::json!({
+                    "v": 1,
+                    "type": "span",
+                }),
+            }
+        );
+
+        assert!(
+            parse_stderr_telemetry_line("@codex-telemetry not-json")
+                .expect("telemetry line")
+                .is_err()
+        );
     }
 }

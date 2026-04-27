@@ -2,6 +2,7 @@ pub(crate) mod config;
 mod events;
 pub(crate) mod metrics;
 pub(crate) mod provider;
+mod stderr_span_telemetry;
 pub(crate) mod trace_context;
 
 mod otlp;
@@ -23,6 +24,8 @@ pub use crate::metrics::runtime_metrics::RuntimeMetricsSummary;
 pub use crate::metrics::timer::Timer;
 pub use crate::metrics::*;
 pub use crate::provider::OtelProvider;
+pub use crate::stderr_span_telemetry::StderrSpanTelemetryError;
+pub use crate::stderr_span_telemetry::emit_node_repl_stderr_span_telemetry;
 pub use crate::trace_context::context_from_w3c_trace_context;
 pub use crate::trace_context::current_span_trace_id;
 pub use crate::trace_context::current_span_w3c_trace_context;

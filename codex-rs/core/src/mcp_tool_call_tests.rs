@@ -763,6 +763,94 @@ async fn codex_apps_tool_call_request_meta_includes_call_id_without_existing_cod
 }
 
 #[test]
+fn node_repl_js_request_meta_includes_otel_stderr_spans_when_trace_context_exists() {
+    use opentelemetry::trace::TracerProvider as _;
+    use opentelemetry_sdk::trace::SdkTracerProvider;
+    use tracing_subscriber::prelude::*;
+
+    let provider = SdkTracerProvider::builder().build();
+    let tracer = provider.tracer("codex-core-mcp-tool-call-tests");
+    let subscriber =
+        tracing_subscriber::registry().with(tracing_opentelemetry::layer().with_tracer(tracer));
+    let _guard = tracing::subscriber::set_default(subscriber);
+
+    let span = tracing::info_span!("mcp.tools.call");
+    let _entered = span.enter();
+
+    let meta = augment_mcp_tool_request_meta_with_otel_stderr_spans(
+        "node_repl",
+        "js",
+        Some(serde_json::json!({
+            "threadId": "thread-live",
+        })),
+    )
+    .expect("meta");
+
+    let telemetry = meta
+        .get(MCP_TOOL_OTEL_STDERR_SPANS_META_KEY)
+        .expect("otel stderr span metadata");
+    assert_eq!(
+        telemetry.get("enabled"),
+        Some(&serde_json::Value::Bool(true))
+    );
+    assert_eq!(
+        telemetry.get("v"),
+        Some(&serde_json::json!(MCP_TOOL_OTEL_STDERR_SPANS_VERSION))
+    );
+    assert!(
+        telemetry
+            .get("traceparent")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|traceparent| traceparent.starts_with("00-"))
+    );
+    assert_eq!(
+        meta.get("threadId"),
+        Some(&serde_json::json!("thread-live"))
+    );
+}
+
+#[test]
+fn otel_stderr_spans_meta_is_only_added_for_node_repl_js_with_trace_context() {
+    assert_eq!(
+        augment_mcp_tool_request_meta_with_otel_stderr_spans(
+            "node_repl",
+            "js",
+            Some(serde_json::json!({"threadId": "thread-live"})),
+        ),
+        Some(serde_json::json!({"threadId": "thread-live"}))
+    );
+
+    use opentelemetry::trace::TracerProvider as _;
+    use opentelemetry_sdk::trace::SdkTracerProvider;
+    use tracing_subscriber::prelude::*;
+
+    let provider = SdkTracerProvider::builder().build();
+    let tracer = provider.tracer("codex-core-mcp-tool-call-tests");
+    let subscriber =
+        tracing_subscriber::registry().with(tracing_opentelemetry::layer().with_tracer(tracer));
+    let _guard = tracing::subscriber::set_default(subscriber);
+    let span = tracing::info_span!("mcp.tools.call");
+    let _entered = span.enter();
+
+    assert_eq!(
+        augment_mcp_tool_request_meta_with_otel_stderr_spans(
+            "node_repl",
+            "other",
+            Some(serde_json::json!({"threadId": "thread-live"})),
+        ),
+        Some(serde_json::json!({"threadId": "thread-live"}))
+    );
+    assert_eq!(
+        augment_mcp_tool_request_meta_with_otel_stderr_spans(
+            "other",
+            "js",
+            Some(serde_json::json!({"threadId": "thread-live"})),
+        ),
+        Some(serde_json::json!({"threadId": "thread-live"}))
+    );
+}
+
+#[test]
 fn mcp_tool_call_thread_id_meta_is_added_to_request_meta() {
     assert_eq!(
         with_mcp_tool_call_thread_id_meta(

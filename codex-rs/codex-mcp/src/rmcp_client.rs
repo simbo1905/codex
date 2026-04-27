@@ -50,6 +50,8 @@ use codex_rmcp_client::ExecutorStdioServerLauncher;
 use codex_rmcp_client::LocalStdioServerLauncher;
 use codex_rmcp_client::RmcpClient;
 use codex_rmcp_client::StdioServerLauncher;
+use codex_rmcp_client::StdioServerTelemetry;
+use codex_rmcp_client::StdioServerTelemetrySink;
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
 use futures::future::Shared;
@@ -70,6 +72,7 @@ pub(crate) const MCP_TOOLS_FETCH_UNCACHED_DURATION_METRIC: &str =
     "codex.mcp.tools.fetch_uncached.duration_ms";
 pub(crate) const DEFAULT_STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
 pub(crate) const DEFAULT_TOOL_TIMEOUT: Duration = Duration::from_secs(120);
+const NODE_REPL_MCP_SERVER_NAME: &str = "node_repl";
 
 #[derive(Clone)]
 pub(crate) struct ManagedClient {
@@ -554,9 +557,17 @@ async fn make_rmcp_client(
             // `RmcpClient` always sees a launched MCP stdio server. The
             // launcher hides whether that means a local child process or an
             // executor process whose stdin/stdout bytes cross the process API.
-            RmcpClient::new_stdio_client(command_os, args_os, env_os, &env_vars, cwd, launcher)
-                .await
-                .map_err(|err| StartupOutcomeError::from(anyhow!(err)))
+            RmcpClient::new_stdio_client(
+                command_os,
+                args_os,
+                env_os,
+                &env_vars,
+                cwd,
+                launcher,
+                node_repl_telemetry_sink(server_name),
+            )
+            .await
+            .map_err(|err| StartupOutcomeError::from(anyhow!(err)))
         }
         McpServerTransportConfig::StreamableHttp {
             url,
@@ -588,4 +599,24 @@ async fn make_rmcp_client(
             .map_err(StartupOutcomeError::from)
         }
     }
+}
+
+fn node_repl_telemetry_sink(server_name: &str) -> Option<StdioServerTelemetrySink> {
+    if server_name != NODE_REPL_MCP_SERVER_NAME {
+        return None;
+    }
+
+    Some(Arc::new(|telemetry: StdioServerTelemetry| {
+        if let Err(error) = codex_otel::emit_node_repl_stderr_span_telemetry(telemetry.payload) {
+            match error {
+                codex_otel::StderrSpanTelemetryError::UnsupportedVersion
+                | codex_otel::StderrSpanTelemetryError::UnsupportedType => {
+                    tracing::debug!("ignoring unsupported node_repl stderr telemetry: {error}");
+                }
+                _ => {
+                    tracing::warn!("ignoring invalid node_repl stderr telemetry: {error}");
+                }
+            }
+        }
+    }))
 }

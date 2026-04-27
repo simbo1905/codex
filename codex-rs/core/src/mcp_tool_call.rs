@@ -482,6 +482,8 @@ async fn execute_mcp_tool_call(
     request_meta: Option<JsonValue>,
 ) -> Result<CallToolResult, String> {
     let request_meta =
+        augment_mcp_tool_request_meta_with_otel_stderr_spans(server, tool_name, request_meta);
+    let request_meta =
         with_mcp_tool_call_thread_id_meta(request_meta, &sess.conversation_id.to_string());
     let request_meta =
         augment_mcp_tool_request_meta_with_sandbox_state(sess, turn_context, server, request_meta)
@@ -668,6 +670,10 @@ const MCP_TOOL_CODEX_APPS_META_KEY: &str = "_codex_apps";
 const MCP_TOOL_OPENAI_OUTPUT_TEMPLATE_META_KEY: &str = "openai/outputTemplate";
 const MCP_TOOL_UI_RESOURCE_URI_META_KEY: &str = "ui/resourceUri";
 const MCP_TOOL_THREAD_ID_META_KEY: &str = "threadId";
+const MCP_TOOL_OTEL_STDERR_SPANS_META_KEY: &str = "x-codex-otel-stderr-spans";
+const MCP_TOOL_OTEL_STDERR_SPANS_VERSION: u64 = 1;
+const NODE_REPL_MCP_SERVER_NAME: &str = "node_repl";
+const NODE_REPL_JS_TOOL_NAME: &str = "js";
 
 fn custom_mcp_tool_approval_mode(
     turn_context: &TurnContext,
@@ -725,6 +731,59 @@ fn build_mcp_tool_call_request_meta(
     }
 
     (!request_meta.is_empty()).then_some(serde_json::Value::Object(request_meta))
+}
+
+fn augment_mcp_tool_request_meta_with_otel_stderr_spans(
+    server: &str,
+    tool_name: &str,
+    meta: Option<serde_json::Value>,
+) -> Option<serde_json::Value> {
+    if server != NODE_REPL_MCP_SERVER_NAME || tool_name != NODE_REPL_JS_TOOL_NAME {
+        return meta;
+    }
+
+    let Some(trace_context) = codex_otel::current_span_w3c_trace_context() else {
+        return meta;
+    };
+    let Some(traceparent) = trace_context.traceparent else {
+        return meta;
+    };
+
+    let mut telemetry_meta = serde_json::Map::new();
+    telemetry_meta.insert("enabled".to_string(), serde_json::Value::Bool(true));
+    telemetry_meta.insert(
+        "v".to_string(),
+        serde_json::Value::Number(MCP_TOOL_OTEL_STDERR_SPANS_VERSION.into()),
+    );
+    telemetry_meta.insert(
+        "traceparent".to_string(),
+        serde_json::Value::String(traceparent),
+    );
+    if let Some(tracestate) = trace_context.tracestate {
+        telemetry_meta.insert(
+            "tracestate".to_string(),
+            serde_json::Value::String(tracestate),
+        );
+    }
+
+    match meta {
+        Some(serde_json::Value::Object(mut map)) => {
+            map.insert(
+                MCP_TOOL_OTEL_STDERR_SPANS_META_KEY.to_string(),
+                serde_json::Value::Object(telemetry_meta),
+            );
+            Some(serde_json::Value::Object(map))
+        }
+        None => {
+            let mut map = serde_json::Map::new();
+            map.insert(
+                MCP_TOOL_OTEL_STDERR_SPANS_META_KEY.to_string(),
+                serde_json::Value::Object(telemetry_meta),
+            );
+            Some(serde_json::Value::Object(map))
+        }
+        other => other,
+    }
 }
 
 fn with_mcp_tool_call_thread_id_meta(
