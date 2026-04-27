@@ -232,6 +232,7 @@ c2ln",
         codex_home,
         AuthCredentialsStoreMode::File,
         /*agent_identity_authapi_base_url*/ None,
+        /*chatgpt_base_url*/ None,
     )
     .await
     .expect("auth should load")

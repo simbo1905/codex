@@ -1094,6 +1094,7 @@ async fn prefers_apikey_when_config_prefers_apikey_even_with_chatgpt_tokens() {
         codex_home.path(),
         AuthCredentialsStoreMode::File,
         /*agent_identity_authapi_base_url*/ None,
+        /*chatgpt_base_url*/ None,
     )
     .await
     {

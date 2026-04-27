@@ -207,7 +207,10 @@ pub async fn run_login_with_agent_identity(
         &config.codex_home,
         &agent_identity,
         config.cli_auth_credentials_store_mode,
-    ) {
+        Some(&config.chatgpt_base_url),
+    )
+    .await
+    {
         Ok(_) => {
             eprintln!("{LOGIN_SUCCESS_MESSAGE}");
             std::process::exit(0);
@@ -366,6 +369,7 @@ pub async fn run_login_status(cli_config_overrides: CliConfigOverrides) -> ! {
         &config.codex_home,
         config.cli_auth_credentials_store_mode,
         config.agent_identity_authapi_base_url.as_deref(),
+        Some(&config.chatgpt_base_url),
     )
     .await
     {
