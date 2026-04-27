@@ -331,16 +331,14 @@ async fn handle_approved_mcp_tool_call(
             request_meta,
         )
         .await?;
-        Ok(
-            postprocess_mcp_tool_result_for_openai_files(
-                sess,
-                turn_context,
-                &server,
-                metadata.and_then(|metadata| metadata.codex_apps_meta.as_ref()),
-                result,
-            )
-            .await,
+        Ok(postprocess_mcp_tool_result_for_openai_files(
+            sess,
+            turn_context,
+            &server,
+            metadata.and_then(|metadata| metadata.codex_apps_meta.as_ref()),
+            result,
         )
+        .await)
     }
     .instrument(mcp_tool_call_span(
         sess,
