@@ -72,6 +72,8 @@ fn fixed_guardian_parent_session_id() -> ThreadId {
         .expect("fixed parent session id should be a valid UUID")
 }
 
+const COMPACT_TEST_GUARDIAN_POLICY_CONFIG: &str = "Allow narrow test actions.";
+
 #[test]
 fn guardian_rejection_circuit_breaker_interrupts_after_three_consecutive_denials() {
     let mut circuit_breaker = GuardianRejectionCircuitBreaker::default();
@@ -164,6 +166,7 @@ async fn guardian_test_session_and_turn_with_config(
     configure(&mut config);
     turn.approval_policy = config.permissions.approval_policy.clone();
     turn.compact_prompt = config.compact_prompt.clone();
+    turn.model_info.auto_compact_token_limit = config.model_auto_compact_token_limit;
     let config = Arc::new(config);
     let models_manager = test_support::models_manager_with_provider(
         config.codex_home.to_path_buf(),
@@ -1807,7 +1810,7 @@ async fn proactive_guardian_sync_compacts_trunk_before_review_request() -> anyho
     skip_if_no_network!(Ok(()));
 
     let server = start_mock_server().await;
-    let compact_summary = "GUARDIAN_COMPACT_SUMMARY";
+    let proactive_compact_summary = "GUARDIAN_PROACTIVE_COMPACT_SUMMARY";
     let first_guardian_assessment = serde_json::json!({
         "risk_level": "low",
         "user_authorization": "high",
@@ -1832,8 +1835,8 @@ async fn proactive_guardian_sync_compacts_trunk_before_review_request() -> anyho
             ]),
             sse(vec![
                 ev_response_created("resp-guardian-compact"),
-                ev_assistant_message("msg-guardian-compact", compact_summary),
-                ev_completed_with_tokens("resp-guardian-compact", /*total_tokens*/ 10),
+                ev_assistant_message("msg-guardian-compact", proactive_compact_summary),
+                ev_completed_with_tokens("resp-guardian-compact", /*total_tokens*/ 0),
             ]),
             sse(vec![
                 ev_response_created("resp-guardian-second-review"),
@@ -1850,7 +1853,8 @@ async fn proactive_guardian_sync_compacts_trunk_before_review_request() -> anyho
             config.permissions.approval_policy = Constrained::allow_any(AskForApproval::OnRequest);
             config.model_provider.name = "OpenAI-compatible guardian compact test".to_string();
             config.compact_prompt = Some(SUMMARIZATION_PROMPT.to_string());
-            config.model_auto_compact_token_limit = Some(1);
+            config.guardian_policy_config = Some(COMPACT_TEST_GUARDIAN_POLICY_CONFIG.to_string());
+            config.model_auto_compact_token_limit = Some(2_500);
         })
         .await;
     seed_guardian_parent_history(&session, &turn).await;
@@ -1960,12 +1964,12 @@ async fn proactive_guardian_sync_compacts_trunk_before_review_request() -> anyho
         3,
         "expected initial review, one proactive compact request, and one later guardian review request"
     );
-    let compact_request = &requests[1];
+    let proactive_compact_request = &requests[1];
     let review_request = &requests[2];
-    assert!(compact_request.body_contains_text(SUMMARIZATION_PROMPT));
+    assert!(proactive_compact_request.body_contains_text(SUMMARIZATION_PROMPT));
     assert!(
-        review_request.body_contains_text(compact_summary),
-        "review request should use compacted guardian trunk history"
+        review_request.body_contains_text(proactive_compact_summary),
+        "review request should use the compacted guardian trunk history"
     );
     assert!(
         review_request.body_contains_text(">>> APPROVAL REQUEST START"),
@@ -2131,7 +2135,7 @@ async fn guardian_pending_tool_call_forces_full_resync_before_skinny_review() ->
     assert!(transcript_sync.contains("[2] tool read_file call: {\"path\":\"Cargo.toml\"}"));
     assert!(
         transcript_sync
-            .contains("[3] tool read_file result: workspace manifest with package name codex-core")
+            .contains("tool read_file result: workspace manifest with package name codex-core")
     );
     let second_approval_message = second_user_messages
         .last()
