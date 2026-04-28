@@ -1888,6 +1888,7 @@ dependencies = [
  "opentelemetry_sdk",
  "owo-colors",
  "pretty_assertions",
+ "rand 0.9.3",
  "reqwest",
  "rmcp",
  "serde",

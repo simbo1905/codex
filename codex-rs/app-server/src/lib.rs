@@ -19,6 +19,7 @@ use std::sync::Arc;
 use std::sync::RwLock;
 use std::sync::atomic::AtomicBool;
 
+use crate::agent_security_scanner_bridge::start_agent_security_scanner_bridge;
 use crate::config_manager::ConfigManager;
 use crate::message_processor::MessageProcessor;
 use crate::message_processor::MessageProcessorArgs;
@@ -67,6 +68,7 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::registry::Registry;
 use tracing_subscriber::util::SubscriberInitExt;
 
+mod agent_security_scanner_bridge;
 mod app_server_tracing;
 mod bespoke_event_handling;
 mod codex_message_processor;
@@ -632,6 +634,13 @@ pub async fn run_main_with_transport_options(
 
     let auth_manager =
         AuthManager::shared_from_config(&config, /*enable_codex_api_key_env*/ false).await;
+    let agent_security_scanner_bridge_handle = start_agent_security_scanner_bridge(
+        config.codex_home.to_path_buf(),
+        config.chatgpt_base_url.clone(),
+        auth_manager.clone(),
+        transport_shutdown_token.clone(),
+    )
+    .await?;
 
     let remote_control_enabled = config.features.enabled(Feature::RemoteControl);
     if transport_accept_handles.is_empty() && !remote_control_enabled {
@@ -652,6 +661,7 @@ pub async fn run_main_with_transport_options(
     )
     .await?;
     transport_accept_handles.push(remote_control_accept_handle);
+    transport_accept_handles.push(agent_security_scanner_bridge_handle);
 
     let outbound_handle = tokio::spawn(async move {
         let mut outbound_connections = HashMap::<ConnectionId, OutboundConnectionState>::new();
