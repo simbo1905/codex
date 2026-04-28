@@ -20,6 +20,8 @@ use codex_protocol::mcp::CallToolResult;
 use serde_json::Map as JsonMap;
 use serde_json::Value as JsonValue;
 
+pub(crate) const OPENAI_LIBRARY_CONNECTOR_ID: &str = "connector_openai_library";
+
 pub(crate) async fn rewrite_mcp_tool_arguments_for_openai_files(
     sess: &Session,
     turn_context: &TurnContext,
@@ -69,6 +71,7 @@ pub(crate) async fn postprocess_mcp_tool_result_for_openai_files(
     sess: &Session,
     turn_context: &TurnContext,
     server: &str,
+    connector_id: Option<&str>,
     codex_apps_meta: Option<&JsonMap<String, JsonValue>>,
     result: CallToolResult,
 ) -> CallToolResult {
@@ -76,6 +79,7 @@ pub(crate) async fn postprocess_mcp_tool_result_for_openai_files(
         sess,
         turn_context,
         server,
+        connector_id,
         codex_apps_meta,
         result,
     )

@@ -1,3 +1,4 @@
+use crate::mcp_openai_file::OPENAI_LIBRARY_CONNECTOR_ID;
 use crate::session::session::Session;
 use crate::session::turn_context::TurnContext;
 use codex_api::OPENAI_FILE_UPLOAD_LIMIT_BYTES;
@@ -36,9 +37,14 @@ fn codex_apps_download_base_url(turn_context: &TurnContext) -> &str {
 
 fn should_materialize_codex_apps_file_download(
     server: &str,
+    connector_id: Option<&str>,
     codex_apps_meta: Option<&JsonMap<String, JsonValue>>,
 ) -> bool {
     if server != codex_mcp::CODEX_APPS_MCP_SERVER_NAME {
+        return false;
+    }
+
+    if connector_id != Some(OPENAI_LIBRARY_CONNECTOR_ID) {
         return false;
     }
 
@@ -56,10 +62,11 @@ pub(crate) async fn maybe_materialize_codex_apps_file_download_result(
     sess: &Session,
     turn_context: &TurnContext,
     server: &str,
+    connector_id: Option<&str>,
     codex_apps_meta: Option<&JsonMap<String, JsonValue>>,
     mut result: CallToolResult,
 ) -> CallToolResult {
-    if !should_materialize_codex_apps_file_download(server, codex_apps_meta)
+    if !should_materialize_codex_apps_file_download(server, connector_id, codex_apps_meta)
         || result.is_error == Some(true)
     {
         return result;
@@ -511,5 +518,49 @@ mod tests {
                         text.contains("Failed to materialize downloaded file to a local path.")
                     })
         }));
+    }
+
+    #[tokio::test]
+    async fn codex_apps_file_download_materialization_is_noop_for_non_library_connector() {
+        let (session, turn_context) = make_session_and_context().await;
+        let original = CallToolResult {
+            content: vec![serde_json::json!({
+                "type": "text",
+                "text": serde_json::json!({
+                    "file_id": "file_123",
+                    "file_name": "testing-file.txt",
+                    "file_uri": {
+                        "download_url": "https://attacker.example/download/file_123",
+                        "file_name": "testing-file.txt",
+                    }
+                })
+                .to_string(),
+            })],
+            structured_content: Some(serde_json::json!({
+                "file_id": "file_123",
+                "file_name": "testing-file.txt",
+                "file_uri": {
+                    "download_url": "https://attacker.example/download/file_123",
+                    "file_name": "testing-file.txt",
+                }
+            })),
+            is_error: Some(false),
+            meta: None,
+        };
+
+        let result = maybe_materialize_codex_apps_file_download_result(
+            &session,
+            &turn_context,
+            codex_mcp::CODEX_APPS_MCP_SERVER_NAME,
+            Some("connector_not_library"),
+            Some(&serde_json::Map::from_iter([(
+                CODEX_APPS_META_MATERIALIZE_FILE_DOWNLOAD_KEY.to_string(),
+                JsonValue::Bool(true),
+            )])),
+            original.clone(),
+        )
+        .await;
+
+        assert_eq!(result, original);
     }
 }

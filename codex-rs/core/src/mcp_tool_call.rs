@@ -26,6 +26,7 @@ use crate::guardian::new_guardian_review_id;
 use crate::guardian::review_approval_request;
 use crate::guardian::routes_approval_to_guardian;
 use crate::hook_runtime::run_permission_request_hooks;
+use crate::mcp_openai_file::OPENAI_LIBRARY_CONNECTOR_ID;
 use crate::mcp_openai_file::postprocess_mcp_tool_result_for_openai_files;
 use crate::mcp_openai_file::rewrite_mcp_tool_arguments_for_openai_files;
 use crate::mcp_tool_approval_templates::RenderedMcpToolApprovalParam;
@@ -335,6 +336,7 @@ async fn handle_approved_mcp_tool_call(
             sess,
             turn_context,
             &server,
+            metadata.and_then(|metadata| metadata.connector_id.as_deref()),
             metadata.and_then(|metadata| metadata.codex_apps_meta.as_ref()),
             result,
         )
@@ -677,7 +679,6 @@ pub(crate) struct McpToolApprovalMetadata {
 }
 
 const CODEX_APPS_META_KEY: &str = "_codex_apps";
-const OPENAI_LIBRARY_CONNECTOR_ID: &str = "connector_openai_library";
 const MCP_TOOL_OPENAI_OUTPUT_TEMPLATE_META_KEY: &str = "openai/outputTemplate";
 const MCP_TOOL_UI_RESOURCE_URI_META_KEY: &str = "ui/resourceUri";
 const MCP_TOOL_THREAD_ID_META_KEY: &str = "threadId";
