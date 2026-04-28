@@ -11960,16 +11960,7 @@
         "$schema": "http://json-schema.org/draft-07/schema#",
         "properties": {
           "pluginId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "pluginName": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "remoteMarketplaceName": {
             "type": [
@@ -11978,6 +11969,9 @@
             ]
           }
         },
+        "required": [
+          "pluginId"
+        ],
         "title": "PluginUninstallParams",
         "type": "object"
       },
