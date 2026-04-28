@@ -3,6 +3,8 @@ mod enroll;
 mod protocol;
 mod websocket;
 
+use crate::transport::remote_control::websocket::RemoteControlChannels;
+use crate::transport::remote_control::websocket::RemoteControlEnvironmentIdPublisher;
 use crate::transport::remote_control::websocket::RemoteControlWebsocket;
 
 pub use self::protocol::ClientId;
@@ -32,6 +34,7 @@ pub(super) struct QueuedServerEnvelope {
 #[derive(Clone)]
 pub(crate) struct RemoteControlHandle {
     enabled_tx: Arc<watch::Sender<bool>>,
+    environment_id_tx: Arc<watch::Sender<Option<String>>>,
 }
 
 impl RemoteControlHandle {
@@ -41,6 +44,10 @@ impl RemoteControlHandle {
             *state = enabled;
             changed
         });
+    }
+
+    pub(crate) fn environment_id_receiver(&self) -> watch::Receiver<Option<String>> {
+        self.environment_id_tx.subscribe()
     }
 }
 
@@ -60,13 +67,19 @@ pub(crate) async fn start_remote_control(
     };
 
     let (enabled_tx, enabled_rx) = watch::channel(initial_enabled);
+    let (environment_id_tx, _environment_id_rx) = watch::channel(None);
+    let environment_id_publisher =
+        RemoteControlEnvironmentIdPublisher::new(environment_id_tx.clone());
     let join_handle = tokio::spawn(async move {
         RemoteControlWebsocket::new(
             remote_control_url,
             remote_control_target,
             state_db,
             auth_manager,
-            transport_event_tx,
+            RemoteControlChannels {
+                transport_event_tx,
+                environment_id_publisher,
+            },
             shutdown_token,
             enabled_rx,
         )
@@ -78,6 +91,7 @@ pub(crate) async fn start_remote_control(
         join_handle,
         RemoteControlHandle {
             enabled_tx: Arc::new(enabled_tx),
+            environment_id_tx: Arc::new(environment_id_tx),
         },
     ))
 }
