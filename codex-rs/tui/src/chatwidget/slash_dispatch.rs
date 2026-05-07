@@ -289,6 +289,15 @@ impl ChatWidget {
                     tx.send(AppEvent::DiffResult(text));
                 });
             }
+            SlashCommand::UndoDiff => {
+                // Ask core for the ghost-snapshot SHAs; the response arrives as
+                // EventMsg::GhostSnapshotShas and is converted to
+                // AppEvent::UndoDiffShaReady in chatwidget.rs, which then
+                // spawns the actual git diff task.
+                self.add_diff_in_progress();
+                self.app_event_tx
+                    .send(AppEvent::CodexOp(Op::GetGhostSnapshotShas));
+            }
             SlashCommand::Mention => {
                 self.insert_str("@");
             }

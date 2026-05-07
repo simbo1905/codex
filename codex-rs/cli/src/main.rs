@@ -29,6 +29,7 @@ use codex_tui::Cli as TuiCli;
 use codex_tui::ExitReason;
 use codex_tui::UpdateAction;
 use codex_utils_cli::CliConfigOverrides;
+use codex_zen_proxy::Args as ZenProxyArgs;
 use owo_colors::OwoColorize;
 use std::io::IsTerminal;
 use std::path::PathBuf;
@@ -156,6 +157,10 @@ enum Subcommand {
     /// Internal: run the responses API proxy.
     #[clap(hide = true)]
     ResponsesApiProxy(ResponsesApiProxyArgs),
+
+    /// Internal: run the Zen translating proxy (GPT passthrough + Claude ↔ Anthropic translation).
+    #[clap(hide = true, name = "zen-proxy")]
+    ZenProxy(ZenProxyArgs),
 
     /// Internal: send one raw Responses API payload through Codex auth.
     #[clap(hide = true)]
@@ -1024,6 +1029,14 @@ async fn cli_main(arg0_paths: Arg0DispatchPaths) -> anyhow::Result<()> {
             )?;
             tokio::task::spawn_blocking(move || codex_responses_api_proxy::run_main(args))
                 .await??;
+        }
+        Some(Subcommand::ZenProxy(args)) => {
+            reject_remote_mode_for_subcommand(
+                root_remote.as_deref(),
+                root_remote_auth_token_env.as_deref(),
+                "zen-proxy",
+            )?;
+            tokio::task::spawn_blocking(move || codex_zen_proxy::run_main(args)).await??;
         }
         Some(Subcommand::Responses(ResponsesCommand {})) => {
             reject_remote_mode_for_subcommand(

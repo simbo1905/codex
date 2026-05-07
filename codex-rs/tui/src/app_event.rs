@@ -180,6 +180,14 @@ pub(crate) enum AppEvent {
     /// Result of computing a `/diff` command.
     DiffResult(String),
 
+    /// The undo stack SHAs arrived from core; now compute the diff.
+    /// Carries the most-recent ghost-snapshot SHA (or an explanatory message
+    /// when the undo feature is off / stack is empty).
+    UndoDiffShaReady(Result<String, String>),
+
+    /// Result of computing a `/undo-diff` command.
+    UndoDiffResult(String),
+
     /// Open the app link view in the bottom pane.
     OpenAppLink {
         app_id: String,

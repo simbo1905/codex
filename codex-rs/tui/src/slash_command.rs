@@ -37,6 +37,8 @@ pub enum SlashCommand {
     // Undo,
     Copy,
     Diff,
+    #[strum(serialize = "undo-diff")]
+    UndoDiff,
     Mention,
     Status,
     DebugConfig,
@@ -85,6 +87,9 @@ impl SlashCommand {
             SlashCommand::Quit | SlashCommand::Exit => "exit Codex",
             SlashCommand::Copy => "copy last response as markdown",
             SlashCommand::Diff => "show git diff (including untracked files)",
+            SlashCommand::UndoDiff => {
+                "diff working tree against a ghost snapshot (requires undo feature)"
+            }
             SlashCommand::Mention => "mention a file",
             SlashCommand::Skills => "use skills to improve how Codex performs specific tasks",
             SlashCommand::Status => "show current session configuration and token usage",
@@ -167,6 +172,7 @@ impl SlashCommand {
             | SlashCommand::MemoryDrop
             | SlashCommand::MemoryUpdate => false,
             SlashCommand::Diff
+            | SlashCommand::UndoDiff
             | SlashCommand::Copy
             | SlashCommand::Rename
             | SlashCommand::Mention

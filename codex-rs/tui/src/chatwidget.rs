@@ -333,6 +333,7 @@ use crate::exec_cell::new_active_exec_command;
 use crate::exec_command::split_command_string;
 use crate::exec_command::strip_bash_lc_and_escape;
 use crate::get_git_diff::get_git_diff;
+use crate::get_undo_diff::get_undo_diff;
 use crate::history_cell;
 #[cfg(test)]
 use crate::history_cell::AgentMessageCell;
@@ -4240,6 +4241,31 @@ impl ChatWidget {
         }
     }
 
+    /// Handle the ghost-snapshot SHA list returned by core in response to
+    /// [`Op::GetGhostSnapshotShas`].  Pick the most-recent SHA and spawn an
+    /// async task that runs `git diff --color <sha>`, emitting the result as
+    /// [`AppEvent::UndoDiffResult`] for the overlay to render.
+    fn on_ghost_snapshot_shas(&mut self, shas: Vec<String>) {
+        let tx = self.app_event_tx.clone();
+        if let Some(sha) = shas.into_iter().next_back() {
+            tokio::spawn(async move {
+                let text = match get_undo_diff(&sha).await {
+                    Ok((true, diff)) if !diff.trim().is_empty() => diff,
+                    Ok((true, _empty)) => format!("No changes since snapshot `{sha}`."),
+                    Ok((false, _)) => "`/undo-diff` — _not inside a git repository_".to_string(),
+                    Err(e) => format!("Failed to compute undo diff: {e}"),
+                };
+                tx.send(AppEvent::UndoDiffResult(text));
+            });
+        } else {
+            self.on_diff_complete();
+            self.add_info_message(
+                "No ghost snapshots available.".to_string(),
+                Some("Enable the undo feature (`features.undo = true` in config.toml) and run at least one turn.".to_string()),
+            );
+        }
+    }
+
     fn on_stream_error(&mut self, message: String, additional_details: Option<String>) {
         if self.retry_status_header.is_none() {
             self.retry_status_header = Some(self.current_status.header.clone());
@@ -6786,6 +6812,7 @@ impl ChatWidget {
             }
             EventMsg::UndoStarted(ev) => self.on_undo_started(ev),
             EventMsg::UndoCompleted(ev) => self.on_undo_completed(ev),
+            EventMsg::GhostSnapshotShas(shas) => self.on_ghost_snapshot_shas(shas),
             EventMsg::StreamError(StreamErrorEvent {
                 message,
                 additional_details,

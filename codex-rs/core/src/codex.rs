@@ -4840,6 +4840,28 @@ async fn submission_loop(sess: Arc<Session>, config: Arc<Config>, rx_sub: Receiv
                     handlers::undo(&sess, sub.id.clone()).await;
                     false
                 }
+                Op::GetGhostSnapshotShas => {
+                    // Collect all GhostSnapshot SHAs from history, oldest-first,
+                    // and emit them back to the client as EventMsg::GhostSnapshotShas.
+                    let history = sess.clone_history().await;
+                    let shas: Vec<String> = history
+                        .raw_items()
+                        .iter()
+                        .filter_map(|item| {
+                            if let ResponseItem::GhostSnapshot { ghost_commit } = item {
+                                Some(ghost_commit.id().to_string())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    sess.send_event_raw(Event {
+                        id: sub.id.clone(),
+                        msg: EventMsg::GhostSnapshotShas(shas),
+                    })
+                    .await;
+                    false
+                }
                 Op::Compact => {
                     handlers::compact(&sess, sub.id.clone()).await;
                     false
@@ -7493,6 +7515,7 @@ fn realtime_text_for_event(msg: &EventMsg) -> Option<String> {
         | EventMsg::BackgroundEvent(_)
         | EventMsg::UndoStarted(_)
         | EventMsg::UndoCompleted(_)
+        | EventMsg::GhostSnapshotShas(_)
         | EventMsg::StreamError(_)
         | EventMsg::TurnDiff(_)
         | EventMsg::GetHistoryEntryResponse(_)

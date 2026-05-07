@@ -661,6 +661,11 @@ pub enum Op {
     /// Request Codex to undo a turn (turn are stacked so it is the same effect as CMD + Z).
     Undo,
 
+    /// Request the list of ghost-snapshot commit SHAs currently on the undo
+    /// stack (oldest first). The response is emitted as
+    /// [`EventMsg::GhostSnapshotShas`].
+    GetGhostSnapshotShas,
+
     /// Request Codex to drop the last N user turns from in-memory context.
     ///
     /// This does not attempt to revert local filesystem changes. Clients are
@@ -786,6 +791,7 @@ impl Op {
             Self::SetThreadName { .. } => "set_thread_name",
             Self::SetThreadMemoryMode { .. } => "set_thread_memory_mode",
             Self::Undo => "undo",
+            Self::GetGhostSnapshotShas => "get_ghost_snapshot_shas",
             Self::ThreadRollback { .. } => "thread_rollback",
             Self::Review { .. } => "review",
             Self::Shutdown => "shutdown",
@@ -1523,6 +1529,11 @@ pub enum EventMsg {
     UndoStarted(UndoStartedEvent),
 
     UndoCompleted(UndoCompletedEvent),
+
+    /// Response to [`Op::GetGhostSnapshotShas`]: the list of ghost-snapshot
+    /// commit SHAs on the undo stack, ordered oldest-first. Empty when the
+    /// undo feature is disabled or no turns have been snapshotted yet.
+    GhostSnapshotShas(Vec<String>),
 
     /// Notification that a model stream experienced an error or disconnect
     /// and the system is handling it (e.g., retrying with backoff).
