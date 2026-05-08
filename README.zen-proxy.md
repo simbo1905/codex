@@ -76,11 +76,16 @@ model = "gpt-5.4"            # or any claude-* model
 model_provider = "zen"
 
 [model_providers.zen]
-name    = "Zen"
+name     = "Zen"
 base_url = "http://127.0.0.1:9099/v1"
-env_key  = "OPENCODE_API_KEY"
 wire_api = "responses"
 ```
+
+**Do not set `env_key` here.**  The proxy holds the API key in locked memory
+and injects it into every upstream request.  `codex` itself must have no
+knowledge of the key — that is the entire point of the privilege-separation
+model.  Setting `env_key` would cause codex to demand the secret in its own
+environment, defeating the security design.
 
 The `model_catalog_json` key can point at a local JSON file listing available
 models so the TUI model-picker is populated without a live `/v1/models` call.
