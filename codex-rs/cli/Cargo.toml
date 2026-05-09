@@ -39,6 +39,7 @@ codex-mcp = { workspace = true }
 codex-mcp-server = { workspace = true }
 codex-protocol = { workspace = true }
 codex-responses-api-proxy = { workspace = true }
+codex-zen-proxy = { workspace = true }
 codex-rmcp-client = { workspace = true }
 codex-sandboxing = { workspace = true }
 codex-state = { workspace = true }

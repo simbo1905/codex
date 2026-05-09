@@ -10,7 +10,8 @@ fn main() {
     // intentionally frozen per-build, not per-source-change.
     println!("cargo:rerun-if-changed=build.rs");
     let stamp = {
-        use std::time::{SystemTime, UNIX_EPOCH};
+        use std::time::SystemTime;
+        use std::time::UNIX_EPOCH;
         let secs = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()

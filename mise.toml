@@ -1,5 +1,0 @@
-[tools]
-uv = "latest"
-
-[env]
-_.python.venv = { path = ".venv", create = true, uv_create_args = ["--python", "3.13"] }

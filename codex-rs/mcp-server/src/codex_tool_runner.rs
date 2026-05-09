@@ -371,6 +371,7 @@ async fn run_codex_tool_session_inner(
                     | EventMsg::SkillsUpdateAvailable
                     | EventMsg::UndoStarted(_)
                     | EventMsg::UndoCompleted(_)
+                    | EventMsg::GhostSnapshotShas(_)
                     | EventMsg::ExitedReviewMode(_)
                     | EventMsg::RequestUserInput(_)
                     | EventMsg::RequestPermissions(_)

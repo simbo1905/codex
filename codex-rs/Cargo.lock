@@ -1700,6 +1700,7 @@ dependencies = [
  "codex-utils-cli",
  "codex-utils-path",
  "codex-windows-sandbox",
+ "codex-zen-proxy",
  "libc",
  "owo-colors",
  "predicates",
@@ -3209,6 +3210,24 @@ dependencies = [
  "windows 0.58.0",
  "windows-sys 0.52.0",
  "winres",
+]
+
+[[package]]
+name = "codex-zen-proxy"
+version = "0.121.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "codex-process-hardening",
+ "ctor 0.6.3",
+ "libc",
+ "pretty_assertions",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tiny_http",
+ "uuid",
+ "zeroize",
 ]
 
 [[package]]

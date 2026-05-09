@@ -4538,6 +4538,24 @@ impl App {
                 ));
                 tui.frame_requester().schedule_frame();
             }
+            AppEvent::UndoDiffShaReady(_) => {
+                // Handled inside ChatWidget via on_ghost_snapshot_shas; this
+                // variant exists only so the type is exhaustive.
+            }
+            AppEvent::UndoDiffResult(text) => {
+                self.chat_widget.on_diff_complete();
+                let _ = tui.enter_alt_screen();
+                let pager_lines: Vec<ratatui::text::Line<'static>> = if text.trim().is_empty() {
+                    vec!["No changes since last snapshot.".italic().into()]
+                } else {
+                    text.lines().map(ansi_escape_line).collect()
+                };
+                self.overlay = Some(Overlay::new_static_with_lines(
+                    pager_lines,
+                    "U N D O  D I F F".to_string(),
+                ));
+                tui.frame_requester().schedule_frame();
+            }
             AppEvent::OpenAppLink {
                 app_id,
                 title,
